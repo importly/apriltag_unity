@@ -3,10 +3,7 @@ import cv2
 import numpy as np
 import glob
 
-try:
-    aruco = cv2.aruco
-except AttributeError:
-    raise ImportError("cv2.aruco module not found. Please install the opencv-contrib-python package.")
+aruco = cv2.aruco
 
 squares_x, squares_y = 9, 12
 square_size_mm = 20.0
