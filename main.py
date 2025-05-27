@@ -1,23 +1,49 @@
 import cv2
 import numpy as np
-import pyrealsense2 as rs
 import socket
 from pupil_apriltags import Detector
 
-# ——— RealSense setup ———
-pipeline = rs.pipeline()
-config   = rs.config()
-config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
-profile  = pipeline.start(config)
+cam_index = 1
 
-# fetch intrinsics
-color_profile = profile.get_stream(rs.stream.color) \
-                       .as_video_stream_profile()
-intr = color_profile.get_intrinsics()
-fx, fy = intr.fx, intr.fy
-cx, cy = intr.ppx, intr.ppy
-# use only the first 4 distortion coeffs (k1,k2,p1,p2)
-dist_coeffs = np.array(intr.coeffs[:4])
+# ——— USB camera setup ———
+cap = cv2.VideoCapture(cam_index)
+# set resolution and framerate (optional)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1200)
+cap.set(cv2.CAP_PROP_FPS, 50)
+
+# ——— Camera intrinsics ———
+# Attempt to load calibration from .npy files
+try:
+    camera_matrix = np.load('camera_matrix1.npy')
+    dist = np.load('dist_coeffs1.npy').ravel()
+    fx = camera_matrix[0, 0]
+    fy = camera_matrix[1, 1]
+    cx = camera_matrix[0, 2]
+    cy = camera_matrix[1, 2]
+    dist_coeffs = dist[:4]
+    print("Loaded calibration from .npy files.")
+except Exception:
+    fs = cv2.FileStorage('calibration_data1.yaml', cv2.FILE_STORAGE_READ)
+    if fs.isOpened():
+        camera_matrix = fs.getNode('K').mat()
+        dist = fs.getNode('distCoeffs').mat().ravel()
+        fx = camera_matrix[0, 0]
+        fy = camera_matrix[1, 1]
+        cx = camera_matrix[0, 2]
+        cy = camera_matrix[1, 2]
+        dist_coeffs = dist[:4]
+        fs.release()
+        print("Loaded calibration from YAML file.")
+    else:
+        # Fallback
+        ret, tmp_frame = cap.read()
+        h, w = tmp_frame.shape[:2]
+        fx = fy = w
+        cx = w / 2
+        cy = h / 2
+        dist_coeffs = np.zeros(4)
+        print("Using fallback intrinsics.")
 
 camera_params = (fx, fy, cx, cy)
 
@@ -31,25 +57,20 @@ detector = Detector(
     decode_sharpening=0.25,
     debug=0
 )
-
-TAG_SIZE = 0.165  # meters
+TAG_SIZE = 0.165
 
 # ——— UDP socket to Unity ———
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-UNITY_IP   = "127.0.0.1"
+UNITY_IP = "127.0.0.1"
 UNITY_PORT = 5065
 
 try:
     while True:
-        # grab a color frame
-        frames = pipeline.wait_for_frames()
-        color = frames.get_color_frame()
-        if not color:
+        ret, frame = cap.read()
+        if not ret:
             continue
-        frame = np.asanyarray(color.get_data())
-        gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # detect + pose
         detections = detector.detect(
             gray,
             estimate_tag_pose=True,
@@ -58,26 +79,12 @@ try:
         )
 
         for det in detections:
-            # get rotation matrix and translation vector
-            R_cam = det.pose_R           # 3×3
-            t_cam = det.pose_t.reshape(3)  # (x, y, z) in meters
-
-            # convert R→rvec
+            R_cam = det.pose_R
+            t_cam = det.pose_t.reshape(3)
             rvec_cam, _ = cv2.Rodrigues(R_cam)
-            r_cam = rvec_cam.flatten()  # (rx, ry, rz), radians
-
-            # —— coordinate‐system flip ——
-            # OpenCV camera coords:  X→right, Y→down, Z→forward
-            # Unity world coords:     X→right, Y→up,   Z→forward
-            # so invert Y & Z axes:
-            t_uni = np.array([  t_cam[0],
-                               -t_cam[1],
-                               -t_cam[2] ])
-            r_uni = np.array([  r_cam[0],
-                               -r_cam[1],
-                               -r_cam[2] ])
-
-            # send: tagID, tx,ty,tz, rx,ry,rz
+            r_cam = rvec_cam.flatten()
+            t_uni = np.array([t_cam[0], -t_cam[1], -t_cam[2]])
+            r_uni = np.array([r_cam[0], -r_cam[1], -r_cam[2]])
             msg = (
                 f"{det.tag_id},"
                 + ",".join(f"{v:.6f}" for v in t_uni)
@@ -86,20 +93,20 @@ try:
             )
             sock.sendto(msg.encode("utf8"), (UNITY_IP, UNITY_PORT))
 
-            # (optional) draw for debugging using original cam pose:
             cv2.drawFrameAxes(
                 frame,
-                np.array([[fx,0,cx],[0,fy,cy],[0,0,1]]),
+                camera_matrix,
                 dist_coeffs,
                 rvec_cam,
                 t_cam.reshape(3,1),
                 0.1
             )
 
-        cv2.imshow("D455 + Apriltag3", frame)
+        cv2.imshow("USB Camera + AprilTag3", frame)
         if cv2.waitKey(1) & 0xFF == 27:
             break
 finally:
-    pipeline.stop()
+    cap.release()
     cv2.destroyAllWindows()
     sock.close()
+

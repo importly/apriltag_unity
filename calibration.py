@@ -6,8 +6,8 @@ import glob
 aruco = cv2.aruco
 
 squares_x, squares_y = 9, 12
-square_size_mm = 20.0
-marker_length_mm = 15.0
+square_size_mm = 20.8 #! TODO fix
+marker_length_mm = 15.5 #! TODO fix
 
 aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_100)
 board = aruco.CharucoBoard((squares_x, squares_y), square_size_mm, marker_length_mm, aruco_dict)
@@ -21,7 +21,7 @@ params.cornerRefinementMinAccuracy = 0.1
 charuco_corners_all = []
 charuco_ids_all = []
 
-images = glob.glob('calibration_images/*.png')
+images = glob.glob('calibration_images/*.jpg')
 for fname in images:
     img = cv2.imread(fname)
     if img is None:
@@ -57,6 +57,9 @@ for fname in images:
     if ret > 0:
         aruco.drawDetectedCornersCharuco(vis, charuco_corners, charuco_ids)
 
+    # cv2.imshow('Charuco Calibration', vis)
+    # cv2.waitKey(0)
+
     if ret > 3:
         charuco_corners_all.append(charuco_corners)
         charuco_ids_all.append(charuco_ids)
@@ -75,12 +78,12 @@ if charuco_corners_all:
     print("Camera matrix (K):\n", K)
     print("Distortion coefficients:\n", distCoeffs.ravel())
 
-    np.save('camera_matrix.npy', K)
-    np.save('dist_coeffs.npy', distCoeffs)
-    fs = cv2.FileStorage('calibration_data.yaml', cv2.FILE_STORAGE_WRITE)
+    np.save('camera_matrix1.npy', K)
+    np.save('dist_coeffs1.npy', distCoeffs)
+    fs = cv2.FileStorage('calibration_data1.yaml', cv2.FILE_STORAGE_WRITE)
     fs.write('K', K)
     fs.write('distCoeffs', distCoeffs)
     fs.release()
-    print("\nSaved: camera_matrix.npy, dist_coeffs.npy, calibration_data.yaml")
+    print("\nSaved: camera_matrix1.npy, dist_coeffs1.npy, calibration_data1.yaml")
 else:
     print("\nNot enough valid Charuco corners detected for calibration.")
