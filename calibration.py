@@ -21,6 +21,7 @@ params.cornerRefinementMinAccuracy = 0.1
 charuco_corners_all = []
 charuco_ids_all = []
 
+
 images = glob.glob('calibration_images/*.jpg')
 for fname in images:
     img = cv2.imread(fname)
@@ -32,6 +33,8 @@ for fname in images:
     corners, ids, rejected = aruco.detectMarkers(gray, aruco_dict, parameters=params)
     num_markers = 0 if ids is None else len(ids)
     print(f"{os.path.basename(fname)} → Detected markers: {num_markers}")
+
+    
 
     if ids is None or len(ids) < 4:
         continue

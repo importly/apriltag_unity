@@ -64,9 +64,9 @@ class OptimizedRealSenseHeadingTracker:
 
         while time.time() - start_time < 5.0:
             try:
-                frames = self.pipeline.wait_for_frames(timeout_ms=50)
+                frames = self.pipeline.wait_for_frames(timeout_ms=50) # type: ignore
                 for frame in frames:
-                    if frame.get_profile().stream_type() == rs.stream.gyro:
+                    if frame.get_profile().stream_type() == rs.stream.gyro: # type: ignore
                         gyro_data = frame.as_motion_frame().get_motion_data()
                         samples.append(gyro_data.y)
             except:
@@ -88,7 +88,7 @@ class OptimizedRealSenseHeadingTracker:
             gyro_frame = None
 
             for frame in frames:
-                if frame.get_profile().stream_type() == rs.stream.gyro:
+                if frame.get_profile().stream_type() == rs.stream.gyro: 
                     gyro_frame = frame
                     break
 
