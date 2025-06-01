@@ -6,8 +6,8 @@ import glob
 aruco = cv2.aruco
 
 squares_x, squares_y = 9, 12
-square_size_mm = 20.8 #! TODO fix
-marker_length_mm = 15.5 #! TODO fix
+square_size_mm = 20 #! TODO fix
+marker_length_mm = 15 #! TODO fix
 
 aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_100)
 board = aruco.CharucoBoard((squares_x, squares_y), square_size_mm, marker_length_mm, aruco_dict)

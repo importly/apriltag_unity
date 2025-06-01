@@ -1,6 +1,6 @@
 /.idea/
 /calibration_images/
 calibration_images.zip
-/calibration_data1.yaml
-/camera_matrix1.npy
-/dist_coeffs1.npy
+/false/calibration_data1.yaml
+/false/camera_matrix1.npy
+/false/dist_coeffs1.npy
