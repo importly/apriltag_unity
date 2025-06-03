@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Optimized RealSense Camera Heading Tracker - High Accuracy, Minimal Code
-Focuses on core accuracy improvements without over-engineering
 """
 
 import pyrealsense2 as rs

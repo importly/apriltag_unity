@@ -68,7 +68,6 @@ class Pose3D:
         return f"Pose3D(translation={self.t}, rotation={self.R})"
 
 # ——— 2D ROBOT POSE & ESTIMATOR ———
-# (unchanged)
 
 class Pose2D:
     def __init__(self, x: float, y: float, yaw: float):
