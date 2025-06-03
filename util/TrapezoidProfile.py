@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from PIDController import PIDController
 
-
 @dataclass
 class TrapezoidProfileState:
     """State for trapezoidal motion profile (position, velocity)."""

@@ -12,7 +12,6 @@ import tkinter as tk
 from collections import deque
 import statistics
 
-
 class OptimizedRealSenseHeadingTracker:
     def __init__(self):
         self.pipeline = None
@@ -301,9 +300,6 @@ class OptimizedHeadingGUI:
 
 
 def main():
-    print("Optimized RealSense Heading Tracker")
-    print("Key optimizations: Minimal filtering, direct integration, fast calibration")
-
     tracker = OptimizedRealSenseHeadingTracker()
 
     if not tracker.initialize_camera():

@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Entry point for the robot program using a simple command-based structure."""
-
 import cv2
 from subsystems.scheduler import CommandScheduler
 from subsystems.vision import VisionSubsystem
@@ -8,8 +5,8 @@ from subsystems.vision import VisionSubsystem
 
 def main() -> None:
     scheduler = CommandScheduler()
-    vision = VisionSubsystem()
-    scheduler.register(vision)
+    # vision = VisionSubsystem()
+    # scheduler.register(vision)
 
     try:
         while True:

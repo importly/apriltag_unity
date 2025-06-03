@@ -32,14 +32,14 @@ class VisionSubsystem(Subsystem):
     ) -> None:
         super().__init__()
         if camera_indices is None:
-            camera_indices = [1]
+            camera_indices = [0]
         self.camera_indices = camera_indices
         self.tag_size = tag_size
         self.caps: list[cv2.VideoCapture] = []
         self.camera_matrices: list[np.ndarray] = []
         self.dist_coeffs_list: list[np.ndarray] = []
         self.camera_params: list[tuple[float, float, float, float]] = []
-        for cam_num, idx in enumerate(camera_indices, start=1):
+        for cam_num, idx in enumerate(camera_indices, start=0):
             cap = cv2.VideoCapture(idx)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
