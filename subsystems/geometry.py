@@ -1,4 +1,9 @@
 import math
+import time
+from collections import OrderedDict
+from dataclasses import dataclass
+from typing import Callable, Optional, Dict
+
 import numpy as np
 
 class Translation3D:
@@ -71,7 +76,9 @@ class Pose3D:
 
 
 class Pose2D:
-    def __init__(self, x: float, y: float, yaw: float):
+    """Lightweight 2D pose representation."""
+
+    def __init__(self, x: float = 0.0, y: float = 0.0, yaw: float = 0.0):
         self.x = x
         self.y = y
         self.yaw = yaw
@@ -79,47 +86,237 @@ class Pose2D:
     def __repr__(self) -> str:
         return f"Pose2D(x={self.x:.3f}, y={self.y:.3f}, yaw={self.yaw:.3f})"
 
+    def copy(self) -> "Pose2D":
+        return Pose2D(self.x, self.y, self.yaw)
 
-class PoseEstimator:
-    """Very small pose estimator using simple averaging of measurements."""
+    @staticmethod
+    def _wrap_angle(angle: float) -> float:
+        while angle > math.pi:
+            angle -= 2 * math.pi
+        while angle < -math.pi:
+            angle += 2 * math.pi
+        return angle
 
-    def __init__(self) -> None:
-        self._measurements = []
+    @staticmethod
+    def interpolate(a: "Pose2D", b: "Pose2D", t: float) -> "Pose2D":
+        t = max(0.0, min(1.0, t))
+        x = a.x + (b.x - a.x) * t
+        y = a.y + (b.y - a.y) * t
+        yaw_diff = Pose2D._wrap_angle(b.yaw - a.yaw)
+        yaw = Pose2D._wrap_angle(a.yaw + yaw_diff * t)
+        return Pose2D(x, y, yaw)
 
-    def add_measurement(
-        self, pose: Pose2D, timestamp: float, std_devs: tuple[float, float, float]
-    ) -> None:
-        self._measurements.append((pose, timestamp, std_devs))
+    def log(self, other: "Pose2D") -> "Twist2D":
+        """Return twist from this pose to ``other``."""
+        dx = other.x - self.x
+        dy = other.y - self.y
+        cos_yaw = math.cos(self.yaw)
+        sin_yaw = math.sin(self.yaw)
+        local_x = cos_yaw * dx + sin_yaw * dy
+        local_y = -sin_yaw * dx + cos_yaw * dy
+        dtheta = Pose2D._wrap_angle(other.yaw - self.yaw)
+        return Twist2D(local_x, local_y, dtheta)
 
-    def estimate(self):
-        if not self._measurements:
+    def exp(self, twist: "Twist2D") -> "Pose2D":
+        cos_yaw = math.cos(self.yaw)
+        sin_yaw = math.sin(self.yaw)
+        x = self.x + twist.dx * cos_yaw - twist.dy * sin_yaw
+        y = self.y + twist.dx * sin_yaw + twist.dy * cos_yaw
+        yaw = Pose2D._wrap_angle(self.yaw + twist.dtheta)
+        return Pose2D(x, y, yaw)
+
+
+@dataclass
+class Twist2D:
+    dx: float
+    dy: float
+    dtheta: float
+
+
+class TimeInterpolatableBuffer:
+    """Buffer storing timestamped samples with interpolation."""
+
+    def __init__(self, interpolate_func: Callable[[Pose2D, Pose2D, float], Pose2D], history: float):
+        self.history = history
+        self.interpolate_func = interpolate_func
+        self.buffer: "OrderedDict[float, Pose2D]" = OrderedDict()
+
+    def add_sample(self, timestamp: float, sample: Pose2D) -> None:
+        self._cleanup(timestamp)
+        self.buffer[timestamp] = sample
+
+    def _cleanup(self, current: float) -> None:
+        while self.buffer:
+            first_ts = next(iter(self.buffer))
+            if current - first_ts >= self.history:
+                self.buffer.popitem(last=False)
+            else:
+                break
+
+    def clear(self) -> None:
+        self.buffer.clear()
+
+    def get_sample(self, timestamp: float) -> Optional[Pose2D]:
+        if not self.buffer:
             return None
 
-        xs, ys, sines, coses = [], [], [], []
-        wxs, wys, wyaws = [], [], []
-        for p, _, (sx, sy, syaw) in self._measurements:
-            xs.append(p.x)
-            ys.append(p.y)
-            coses.append(math.cos(p.yaw))
-            sines.append(math.sin(p.yaw))
-            wxs.append(1 / sx ** 2)
-            wys.append(1 / sy ** 2)
-            wyaws.append(1 / syaw ** 2)
+        if timestamp in self.buffer:
+            return self.buffer[timestamp]
 
-        sum_wx = sum(wxs)
-        sum_wy = sum(wys)
-        sum_wyaw = sum(wyaws)
-        x_est = sum(x * w for x, w in zip(xs, wxs)) / sum_wx
-        y_est = sum(y * w for y, w in zip(ys, wys)) / sum_wy
-        cos_avg = sum(c * w for c, w in zip(coses, wyaws)) / sum_wyaw
-        sin_avg = sum(s * w for s, w in zip(sines, wyaws)) / sum_wyaw
-        yaw_est = math.atan2(sin_avg, cos_avg)
+        items = list(self.buffer.items())
+        for i, (ts, _) in enumerate(items):
+            if ts > timestamp:
+                break
+        else:
+            return items[-1][1]
 
-        return (
-            Pose2D(x_est, y_est, yaw_est),
-            (
-                math.sqrt(1 / sum_wx),
-                math.sqrt(1 / sum_wy),
-                math.sqrt(1 / sum_wyaw),
-            ),
+        if i == 0:
+            return items[0][1]
+
+        t0, v0 = items[i - 1]
+        t1, v1 = items[i]
+        ratio = (timestamp - t0) / (t1 - t0)
+        return self.interpolate_func(v0, v1, ratio)
+
+    def internal_buffer(self) -> "OrderedDict[float, Pose2D]":
+        return self.buffer
+
+
+class PoseEstimator:
+    """Fuses odometry and vision measurements similar to WPILib's estimator."""
+
+    kBufferDuration = 1.5
+
+    def __init__(
+        self,
+        state_std_devs: tuple[float, float, float] = (0.02, 0.02, math.radians(1)),
+        vision_std_devs: tuple[float, float, float] = (0.1, 0.1, math.radians(3)),
+    ) -> None:
+        self.q = np.array([s * s for s in state_std_devs])
+        self.vision_k = np.zeros(3)
+        self.set_vision_measurement_std_devs(vision_std_devs)
+
+        self.pose_estimate = Pose2D()
+        self.odometry_buffer = TimeInterpolatableBuffer(Pose2D.interpolate, self.kBufferDuration)
+        self.vision_updates: Dict[float, "VisionUpdate"] = OrderedDict()
+
+    def set_vision_measurement_std_devs(self, std_devs: tuple[float, float, float]) -> None:
+        r = [d * d for d in std_devs]
+        for i in range(3):
+            if self.q[i] == 0.0:
+                self.vision_k[i] = 0.0
+            else:
+                self.vision_k[i] = self.q[i] / (self.q[i] + math.sqrt(self.q[i] * r[i]))
+
+    # ------------------------------------------------------------------ reset
+    def reset_pose(self, pose: Pose2D) -> None:
+        self.pose_estimate = pose.copy()
+        self.odometry_buffer.clear()
+        self.vision_updates.clear()
+
+    # ------------------------------------------------------------------- state
+    def get_estimated_position(self) -> Pose2D:
+        return self.pose_estimate
+
+    # ------------------------------------------------------------------- update
+    def update(self, timestamp: Optional[float], odometry_pose: Pose2D) -> Pose2D:
+        if timestamp is None:
+            timestamp = time.time()
+        self.odometry_buffer.add_sample(timestamp, odometry_pose)
+
+        if self.vision_updates:
+            last_update = next(reversed(self.vision_updates.values()))
+            self.pose_estimate = last_update.compensate(odometry_pose)
+        else:
+            self.pose_estimate = odometry_pose
+
+        return self.pose_estimate
+
+    # ---------------------------------------------------------------- vision
+    def _clean_up_vision_updates(self) -> None:
+        if not self.odometry_buffer.buffer:
+            return
+
+        oldest_ts = next(iter(self.odometry_buffer.buffer))
+        if not self.vision_updates or oldest_ts < next(iter(self.vision_updates)):
+            return
+
+        newest_needed = max(ts for ts in self.vision_updates if ts <= oldest_ts)
+        for ts in list(self.vision_updates.keys()):
+            if ts < newest_needed:
+                self.vision_updates.pop(ts)
+
+    def sample_at(self, timestamp: float) -> Optional[Pose2D]:
+        if not self.odometry_buffer.buffer:
+            return None
+
+        oldest = next(iter(self.odometry_buffer.buffer))
+        newest = next(reversed(self.odometry_buffer.buffer))
+        timestamp = max(min(timestamp, newest), oldest)
+
+        if not self.vision_updates or timestamp < next(iter(self.vision_updates)):
+            return self.odometry_buffer.get_sample(timestamp)
+
+        floor_ts = max(ts for ts in self.vision_updates if ts <= timestamp)
+        vision_update = self.vision_updates[floor_ts]
+        odometry_est = self.odometry_buffer.get_sample(timestamp)
+        if odometry_est is None:
+            return None
+        return vision_update.compensate(odometry_est)
+
+    def add_measurement(
+        self,
+        vision_pose: Pose2D,
+        timestamp: float,
+        std_devs: tuple[float, float, float] | None = None,
+    ) -> None:
+        if std_devs is not None:
+            self.set_vision_measurement_std_devs(std_devs)
+        self.add_vision_measurement(vision_pose, timestamp)
+
+    def add_vision_measurement(self, vision_pose: Pose2D, timestamp: float) -> None:
+        if not self.odometry_buffer.buffer or (
+            next(reversed(self.odometry_buffer.buffer)) - self.kBufferDuration > timestamp
+        ):
+            return
+
+        self._clean_up_vision_updates()
+
+        odom_sample = self.odometry_buffer.get_sample(timestamp)
+        if odom_sample is None:
+            return
+
+        vision_sample = self.sample_at(timestamp)
+        if vision_sample is None:
+            return
+
+        twist = vision_sample.log(vision_pose)
+        k_times_twist = Twist2D(
+            self.vision_k[0] * twist.dx,
+            self.vision_k[1] * twist.dy,
+            self.vision_k[2] * twist.dtheta,
         )
+        vision_update = VisionUpdate(vision_sample.exp(k_times_twist), odom_sample)
+
+        self.vision_updates[timestamp] = vision_update
+        # remove later updates
+        for ts in list(self.vision_updates.keys()):
+            if ts > timestamp:
+                self.vision_updates.pop(ts)
+
+        self.pose_estimate = vision_update.compensate(self.pose_estimate)
+
+
+    def estimate(self) -> tuple[Pose2D, tuple[float, float, float]]:
+        """Return the latest pose estimate."""
+        return self.pose_estimate, (0.0, 0.0, 0.0)
+
+
+class VisionUpdate:
+    def __init__(self, vision_pose: Pose2D, odometry_pose: Pose2D):
+        self.vision_pose = vision_pose
+        self.odometry_pose = odometry_pose
+
+    def compensate(self, pose: Pose2D) -> Pose2D:
+        delta = pose.log(self.odometry_pose)
+        return self.vision_pose.exp(delta)

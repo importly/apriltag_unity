@@ -97,6 +97,7 @@ class VisionSubsystem(Subsystem):
         }
 
         self.sock = self._connect_to_spu(spu_host, spu_port)
+        self.pose_estimator = PoseEstimator()
 
     # ------------------------------------------------------------------ utils
     def _connect_to_spu(self, host: str, port: int, retry_delay: float = 1.0):
@@ -144,9 +145,9 @@ class VisionSubsystem(Subsystem):
                 )
             cv2.imshow(f"Cam {idx}", frame)
 
-        estimator = PoseEstimator()
-        self._process_vision_measurements(detections_by_camera, timestamp, estimator)
-        fused = estimator.estimate()
+        self.pose_estimator.update(timestamp, self.pose_estimator.get_estimated_position())
+        self._process_vision_measurements(detections_by_camera, timestamp, self.pose_estimator)
+        fused = self.pose_estimator.estimate()
         if fused:
             pose2d, stddevs = fused
             print(f"[{timestamp:.3f}] Fused pose → {pose2d}, σ = {stddevs}")
