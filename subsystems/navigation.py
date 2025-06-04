@@ -352,6 +352,8 @@ class RobotNavigationSystem:
 
     def _control_loop(self):
         """Main control loop (runs in separate thread)"""
+        from util.logging_utils import warn_if_overrun
+
         while self.control_loop_running:
             start_time = time.time()
 
@@ -365,7 +367,10 @@ class RobotNavigationSystem:
             # Sleep to maintain control rate
             elapsed = time.time() - start_time
             sleep_time = max(0, self.controller.control_period - elapsed)
-            time.sleep(sleep_time)
+            if sleep_time <= 0:
+                warn_if_overrun("Nav control loop", elapsed, self.controller.control_period)
+            else:
+                time.sleep(sleep_time)
 
     def get_status(self) -> dict:
         """Get navigation system status"""

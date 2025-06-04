@@ -2,9 +2,13 @@ import cv2
 from subsystems.scheduler import CommandScheduler
 from subsystems.drive import DriveSubsystem
 from subsystems.vision import VisionSubsystem
+from util.logging_utils import get_robot_logger
+
+logger = get_robot_logger(__name__)
 
 
 def main() -> None:
+    logger.info("Robot program starting")
     scheduler = CommandScheduler()
     drive = DriveSubsystem()
     scheduler.register(drive)
@@ -18,6 +22,7 @@ def main() -> None:
                 break
     finally:
         scheduler.shutdown()
+        logger.info("Robot program exiting")
 
 
 if __name__ == "__main__":

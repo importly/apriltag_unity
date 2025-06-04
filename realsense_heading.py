@@ -12,6 +12,10 @@ import tkinter as tk
 from collections import deque
 import statistics
 
+from util.logging_utils import get_robot_logger
+
+logger = get_robot_logger(__name__)
+
 class OptimizedRealSenseHeadingTracker:
     def __init__(self):
         self.pipeline = None
@@ -43,7 +47,7 @@ class OptimizedRealSenseHeadingTracker:
                 try:
                     config.enable_stream(rs.stream.gyro, rs.format.motion_xyz32f, gyro_rate)
                     self.pipeline.start(config)
-                    print(f"Initialized at {gyro_rate}Hz")
+                    logger.info("Initialized at %sHz", gyro_rate)
                     return True
                 except:
                     self.pipeline = rs.pipeline()
@@ -51,12 +55,12 @@ class OptimizedRealSenseHeadingTracker:
                     continue
             return False
         except Exception as e:
-            print(f"Init error: {e}")
+            logger.error("Init error: %s", e)
             return False
 
     def calibrate(self):
         """Fast, robust calibration"""
-        print("Calibrating (5 seconds, keep still)...")
+        logger.info("Calibrating (5 seconds, keep still)...")
         samples = []
         start_time = time.time()
 
@@ -74,7 +78,9 @@ class OptimizedRealSenseHeadingTracker:
             # Use median for outlier rejection
             self.gyro_bias_y = statistics.median(samples)
             noise_level = statistics.stdev(samples) if len(samples) > 1 else 0
-            print(f"Bias: {self.gyro_bias_y:.6f}, Noise: {noise_level:.6f}")
+            logger.info(
+                "Bias: %.6f, Noise: %.6f", self.gyro_bias_y, noise_level
+            )
             self.is_calibrated = True
             return True
         return False
@@ -303,22 +309,31 @@ def main():
     tracker = OptimizedRealSenseHeadingTracker()
 
     if not tracker.initialize_camera():
-        print("Failed to initialize camera")
+        logger.error("Failed to initialize camera")
         return
 
     if not tracker.calibrate():
-        print("Calibration failed")
+        logger.error("Calibration failed")
         return
 
     tracker.running = True
 
     # Background tracking thread
     def track():
+        from util.logging_utils import warn_if_overrun
+        period = 0.002
         while tracker.running:
+            start = time.time()
             tracker.update_heading()
-            time.sleep(0.002)  # 500Hz for maximum precision
+            elapsed = time.time() - start
+            sleep_time = max(0, period - elapsed)
+            if sleep_time <= 0:
+                warn_if_overrun("Heading track", elapsed, period)
+            else:
+                time.sleep(sleep_time)
 
     Thread(target=track, daemon=True).start()
+    logger.info("RealSense heading tracking started")
 
 
 if __name__ == "__main__":
