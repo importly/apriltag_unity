@@ -3,7 +3,6 @@ import math
 from typing import Optional, Tuple
 from dataclasses import dataclass
 
-from PIDController import PIDController
 
 @dataclass
 class TrapezoidProfileState:

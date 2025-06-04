@@ -325,6 +325,7 @@ def main():
         while tracker.running:
             start = time.time()
             tracker.update_heading()
+            logger.debug("Heading: %.2f°", tracker.get_heading())
             elapsed = time.time() - start
             sleep_time = max(0, period - elapsed)
             if sleep_time <= 0:
@@ -334,6 +335,16 @@ def main():
 
     Thread(target=track, daemon=True).start()
     logger.info("RealSense heading tracking started")
+
+    # # Start GUI
+    # gui = OptimizedHeadingGUI(tracker)
+    # try:
+    #     gui.run()
+    # except KeyboardInterrupt:
+    #     pass
+    # finally:
+    #     tracker.stop()
+
 
 
 if __name__ == "__main__":

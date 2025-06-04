@@ -223,7 +223,7 @@ class DifferentialDriveController:
             Tuple of (left_motor_command, right_motor_command) in range [-1, 1]
         """
         if not self.enabled:
-            return (0.0, 0.0)
+            return 0.0, 0.0
 
         with self.lock:
             current = self.current_pose
@@ -247,9 +247,6 @@ class DifferentialDriveController:
         elif abs(heading_error) > math.radians(15):  # If heading error > 15 degrees
             linear_output *= 0.6  # Reduce linear speed moderately
 
-        # Angular velocity to reach target orientation
-        # When far from target, prioritize heading towards target
-        # When close to target, prioritize final orientation
         if distance_to_target > 0.2:  # Far from target - focus on heading
             desired_yaw = angle_to_target
         else:  # Close to target - focus on final orientation
@@ -296,14 +293,12 @@ class DifferentialDriveController:
 
 class RobotNavigationSystem:
     """
-    Complete navigation system that integrates with your vision system.
+    Complete navigation system
     """
 
     def __init__(self, config: RobotConfig):
         self.config = config
         self.controller = DifferentialDriveController(config)
-
-        # For sending motor commands (you'll need to implement this)
         self.motor_command_callback = None
 
         # Control loop

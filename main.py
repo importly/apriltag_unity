@@ -8,10 +8,12 @@ logger = get_robot_logger(__name__)
 
 
 def main() -> None:
-    logger.info("Robot program starting")
+
     scheduler = CommandScheduler()
     drive = DriveSubsystem()
     scheduler.register(drive)
+    # vision = VisionSubsystem()
+    # scheduler.register(vision)
 
     # Initialize robot at origin facing north
     drive.update_pose(0.0, 0.0, 0.0)

@@ -1,7 +1,7 @@
 from typing import Optional
 
-from PIDController import PIDController
-from TrapezoidProfile import TrapezoidProfile, TrapezoidProfileState, TrapezoidProfileConstraints
+from util.TrapezoidProfile import TrapezoidProfile, TrapezoidProfileState, TrapezoidProfileConstraints
+from util.PIDController import PIDController
 
 
 class ProfiledPIDController:
