@@ -15,6 +15,9 @@ from .geometry import (
     PoseEstimator,
 )
 from .scheduler import Subsystem
+from util.logging_utils import get_robot_logger
+
+logger = get_robot_logger(__name__)
 
 
 class VisionSubsystem(Subsystem):
@@ -39,6 +42,7 @@ class VisionSubsystem(Subsystem):
         self.camera_matrices: list[np.ndarray] = []
         self.dist_coeffs_list: list[np.ndarray] = []
         self.camera_params: list[tuple[float, float, float, float]] = []
+        self.frame_period = 1.0 / frame_rate if frame_rate > 0 else 0.0
         for cam_num, idx in enumerate(camera_indices, start=0):
             cap = cv2.VideoCapture(idx)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
@@ -53,7 +57,7 @@ class VisionSubsystem(Subsystem):
             if cm_npy.exists() and dist_npy.exists():
                 K = np.load(cm_npy)
                 dist = np.load(dist_npy).ravel()
-                print(f"[Cam{cam_num}] Loaded .npy calibration.")
+                logger.info("[Cam%s] Loaded .npy calibration.", cam_num)
             else:
                 fs = cv2.FileStorage(
                     f"calibration_data{cam_num}.yaml", cv2.FILE_STORAGE_READ
@@ -65,7 +69,7 @@ class VisionSubsystem(Subsystem):
                 K = fs.getNode("K").mat()
                 dist = fs.getNode("distCoeffs").mat().ravel()
                 fs.release()
-                print(f"[Cam{cam_num}] Loaded YAML calibration.")
+                logger.info("[Cam%s] Loaded YAML calibration.", cam_num)
             fx, fy = K[0, 0], K[1, 1]
             cx, cy = K[0, 2], K[1, 2]
             self.camera_matrices.append(K)
@@ -104,18 +108,22 @@ class VisionSubsystem(Subsystem):
         while True:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                print(f"[TCP] Connecting to SPU on {host}:{port}…")
+                logger.info("[TCP] Connecting to SPU on %s:%s…", host, port)
                 sock.connect((host, port))
-                print("[TCP] ▶︎ Connected to SPU")
+                logger.info("[TCP] ▶︎ Connected to SPU")
                 return sock
             except Exception as e:
-                print(
-                    f"[TCP] ERROR connecting to SPU: {e}. Retrying in {retry_delay}s…"
+                logger.error(
+                    "[TCP] ERROR connecting to SPU: %s. Retrying in %ss…",
+                    e,
+                    retry_delay,
                 )
                 time.sleep(retry_delay)
 
     # --------------------------------------------------------------- subsystem
     def periodic(self) -> None:  # type: ignore[override]
+        from util.logging_utils import warn_if_overrun
+        start_time = time.time()
         detections_by_camera: dict[int, list] = {}
         timestamp = time.time()
         for idx, cap in zip(self.camera_indices, self.caps):
@@ -150,18 +158,28 @@ class VisionSubsystem(Subsystem):
         fused = self.pose_estimator.estimate()
         if fused:
             pose2d, stddevs = fused
-            print(f"[{timestamp:.3f}] Fused pose → {pose2d}, σ = {stddevs}")
+            logger.info(
+                "[%.3f] Fused pose → %s, σ = %s",
+                timestamp,
+                pose2d,
+                stddevs,
+            )
             line = f"{pose2d.x:.4f},{pose2d.y:.4f},{pose2d.yaw:.4f}\r\n"
             try:
                 self.sock.sendall(line.encode("utf8"))
             except Exception as e:
-                print(f"[TCP] ERROR sending to SPU: {e}. Reconnecting…")
+                logger.error("[TCP] ERROR sending to SPU: %s. Reconnecting…", e)
                 self.sock.close()
                 self.sock = self._connect_to_spu(
                     self.sock.getpeername()[0], self.sock.getpeername()[1]
                 )
         else:
-            print(f"[{timestamp:.3f}] No valid tag detections.")
+            logger.info("[%.3f] No valid tag detections.", timestamp)
+
+        # Warn if processing time exceeds expected frame period
+        elapsed = time.time() - start_time
+        if self.frame_period > 0:
+            warn_if_overrun("Vision periodic", elapsed, self.frame_period)
 
     def _process_vision_measurements(self, dets_by_cam, timestamp, estimator):
         for cam_idx, dets in dets_by_cam.items():

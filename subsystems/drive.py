@@ -6,6 +6,9 @@ from typing import Optional
 
 from subsystems.navigation import RobotConfig, RobotNavigationSystem
 from .scheduler import Subsystem
+from util.logging_utils import get_robot_logger
+
+logger = get_robot_logger(__name__)
 
 
 class DriveSubsystem(Subsystem):
@@ -27,13 +30,15 @@ class DriveSubsystem(Subsystem):
         while True:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                print(f"[TCP] Connecting to SPU on {host}:{port}…")
+                logger.info("[TCP] Connecting to SPU on %s:%s…", host, port)
                 sock.connect((host, port))
-                print("[TCP] ▶︎ Connected to SPU")
+                logger.info("[TCP] ▶︎ Connected to SPU")
                 return sock
             except Exception as e:
-                print(
-                    f"[TCP] ERROR connecting to SPU: {e}. Retrying in {retry_delay}s…"
+                logger.error(
+                    "[TCP] ERROR connecting to SPU: %s. Retrying in %ss…",
+                    e,
+                    retry_delay,
                 )
                 time.sleep(retry_delay)
 
@@ -42,8 +47,9 @@ class DriveSubsystem(Subsystem):
         line = f"{left:.2f},{right:.2f}\r\n"
         try:
             self.sock.sendall(line.encode("utf8"))
+            logger.debug("Sent motor commands: %s", line.strip())
         except Exception as e:
-            print(f"[TCP] ERROR sending to SPU: {e}. Reconnecting…")
+            logger.error("[TCP] ERROR sending to SPU: %s. Reconnecting…", e)
             self.sock.close()
             self.sock = self._connect_to_spu(self.spu_host, self.spu_port)
 
@@ -51,9 +57,10 @@ class DriveSubsystem(Subsystem):
     def periodic(self) -> None:  # type: ignore[override]
         status = self.nav.get_status()
         if status.get("enabled"):
-            print(
-                f"[Drive] dist={status['distance_to_target']:.2f}m, "
-                f"angle={status['angle_error_deg']:.1f}°"
+            logger.info(
+                "[Drive] dist=%.2fm, angle=%.1f°",
+                status["distance_to_target"],
+                status["angle_error_deg"],
             )
 
     def close(self) -> None:  # type: ignore[override]
