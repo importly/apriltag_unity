@@ -31,7 +31,7 @@ class DriveSubsystem(Subsystem):
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 logger.info("[TCP] Connecting to SPU on %s:%s…", host, port)
-                # sock.connect((host, port))
+                sock.connect((host, port))
                 logger.info("[TCP] ▶︎ Connected to SPU")
                 return sock
             except Exception as e:
@@ -45,7 +45,7 @@ class DriveSubsystem(Subsystem):
     def _send_motor_commands(self, left: float, right: float) -> None:
         """Send motor commands to the SPU over TCP."""
         try:
-            # self.sock.sendall(line.encode("utf8"))
+            self.sock.sendall(f"{left:.2f},{right:.2f}".strip().encode("utf8"))
             logger.debug("Sent motor commands: %s | Current Position: %.2f, %.2f, %.2f",
                          f"{left:.2f},{right:.2f}".strip(), self.nav.controller.current_pose.x,
                          self.nav.controller.current_pose.y, self.nav.controller.current_pose.yaw)

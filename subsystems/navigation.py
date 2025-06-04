@@ -25,7 +25,7 @@ __all__ = [
 
 
 @dataclass
-class RobotConfig:
+class RobotConfig: # TODO: fix
     """Configuration parameters for the differential drive robot."""
     wheelbase_inches: float = 20.0  # Distance between wheels
     wheel_diameter_inches: float = 4.0  # Wheel diameter
@@ -134,14 +134,14 @@ class DifferentialDriveController:
         self.control_period = control_period
 
         # Default motion constraints if not provided
-        if linear_constraints is None:
+        if linear_constraints is None: # TODO: fix
             max_linear_vel = config.max_wheel_speed_ms * 0.8  # 80% of max for safety
             linear_constraints = TrapezoidProfileConstraints(
                 max_velocity=max_linear_vel,
                 max_acceleration=max_linear_vel * 2.0  # Reach max speed in 0.5s
             )
 
-        if angular_constraints is None:
+        if angular_constraints is None: # TODO: fix
             # Maximum angular velocity when one wheel forward, one backward at max speed
             max_angular_vel = (2 * config.max_wheel_speed_ms) / config.wheelbase_meters
             max_angular_vel *= 0.6  # 60% of theoretical max for safety
@@ -152,14 +152,14 @@ class DifferentialDriveController:
 
         # PID Controllers for linear and angular motion
         # You may need to tune these gains for your specific robot
-        self.linear_controller = ProfiledPIDController(
-            kp=2.0, ki=0.0, kd=0.1,
+        self.linear_controller = ProfiledPIDController( # TODO: fix
+            kp=1.0, ki=0.0, kd=0.1,
             constraints=linear_constraints,
             period=control_period
         )
 
-        self.angular_controller = ProfiledPIDController(
-            kp=3.0, ki=0.0, kd=0.15,
+        self.angular_controller = ProfiledPIDController( # TODO: fix
+            kp=1.0, ki=0.0, kd=0.15,
             constraints=angular_constraints,
             period=control_period
         )
