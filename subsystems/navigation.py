@@ -309,10 +309,29 @@ class RobotNavigationSystem:
         # Control loop
         self.control_loop_running = False
         self.control_thread = None
+        self._last_update_time: float | None = None
 
     def set_motor_command_callback(self, callback):
         """Set callback function to send motor commands to hardware"""
         self.motor_command_callback = callback
+
+    # ---------------------------------------------------------------- odometry
+    def _update_odometry(self, left_speed: float, right_speed: float, dt: float) -> None:
+        """Integrate wheel speeds to update the robot pose."""
+        if dt <= 0:
+            return
+        twist = self.controller.kinematics.from_wheel_speeds(WheelSpeeds(left_speed, right_speed))
+        pose = self.controller.current_pose
+        dx = twist.linear * dt * math.cos(pose.yaw)
+        dy = twist.linear * dt * math.sin(pose.yaw)
+        dyaw = twist.angular * dt
+        new_yaw = pose.yaw + dyaw
+        while new_yaw > math.pi:
+            new_yaw -= 2 * math.pi
+        while new_yaw < -math.pi:
+            new_yaw += 2 * math.pi
+        new_pose = Pose2D(pose.x + dx, pose.y + dy, new_yaw)
+        self.controller.set_current_pose(new_pose)
 
     def update_pose_from_vision(self, x: float, y: float, yaw: float):
         """Update robot pose from vision system (call this when you get fused pose)"""
@@ -356,9 +375,19 @@ class RobotNavigationSystem:
 
         while self.control_loop_running:
             start_time = time.time()
+            if self._last_update_time is None:
+                self._last_update_time = start_time
+            dt = start_time - self._last_update_time
+            self._last_update_time = start_time
 
             # Calculate control output
             left_cmd, right_cmd = self.controller.calculate_control_output()
+
+            # Update odometry based on commanded wheel speeds
+            max_speed = self.config.max_wheel_speed_ms
+            left_speed = left_cmd * max_speed
+            right_speed = right_cmd * max_speed
+            self._update_odometry(left_speed, right_speed, dt)
 
             # Send motor commands
             if self.motor_command_callback:
