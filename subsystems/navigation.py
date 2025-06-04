@@ -1,13 +1,27 @@
-#!/usr/bin/env python3
+"""Differential drive navigation helpers."""
+
+from __future__ import annotations
+
 import math
 import time
 import threading
 from dataclasses import dataclass
 from typing import Optional, Tuple
+
 import numpy as np
 
-from TrapezoidProfile import TrapezoidProfileConstraints
-from ProfiledPIDController import ProfiledPIDController
+from util.TrapezoidProfile import TrapezoidProfileConstraints
+from util.ProfiledPIDController import ProfiledPIDController
+
+__all__ = [
+    "RobotConfig",
+    "Pose2D",
+    "WheelSpeeds",
+    "Twist2D",
+    "DifferentialDriveKinematics",
+    "DifferentialDriveController",
+    "RobotNavigationSystem",
+]
 
 
 @dataclass
@@ -360,89 +374,3 @@ class RobotNavigationSystem:
     def is_at_target(self) -> bool:
         """Check if robot has reached target"""
         return self.controller.at_target()
-
-
-# Example integration with your vision system
-class VisionIntegratedRobot:
-    """Example of how to integrate with your existing vision system"""
-
-    def __init__(self):
-        # Configure your robot parameters
-        self.robot_config = RobotConfig(
-            wheelbase_inches=20.0,
-            wheel_diameter_inches=4.0,
-            max_wheel_rpm=600.0
-        )
-
-        # Create navigation system
-        self.nav_system = RobotNavigationSystem(self.robot_config)
-
-        # Set up motor command callback
-        self.nav_system.set_motor_command_callback(self.send_motor_commands)
-
-    def send_motor_commands(self, left_cmd: float, right_cmd: float):
-        """
-        Send motor commands to your robot hardware.
-        You'll need to implement this based on your communication protocol.
-        """
-        print(f"Motor Commands: Left={left_cmd:.3f}, Right={right_cmd:.3f}")
-        # TODO: Send commands to your robot (via serial, TCP, etc.)
-
-    def process_vision_update(self, x: float, y: float, yaw: float):
-        """
-        Call this function when you get a pose update from your vision system.
-        This would replace/augment the pose handling in your main vision loop.
-        """
-        # Update robot pose
-        self.nav_system.update_pose_from_vision(x, y, yaw)
-
-        # Print status
-        status = self.nav_system.get_status()
-        if status['enabled']:
-            print(f"Nav Status: Distance to target: {status['distance_to_target']:.3f}m, "
-                  f"Angle error: {status['angle_error_deg']:.1f}°, "
-                  f"At target: {status['at_target']}")
-
-    def navigate_to_pose(self, x: float, y: float, yaw_degrees: float):
-        """Navigate to a target pose"""
-        yaw_radians = math.radians(yaw_degrees)
-        print(f"Navigating to: x={x:.3f}, y={y:.3f}, yaw={yaw_degrees:.1f}°")
-        self.nav_system.navigate_to(x, y, yaw_radians)
-
-    def stop_navigation(self):
-        """Stop navigation"""
-        self.nav_system.stop()
-
-
-# Example usage
-if __name__ == "__main__":
-    # Create robot instance
-    robot = VisionIntegratedRobot()
-
-    # Simulate receiving pose updates from vision system
-    print("=== Simulating Vision-Based Navigation ===")
-
-    # Set initial pose
-    robot.process_vision_update(0.0, 0.0, 0.0)
-
-    # Navigate to target
-    robot.navigate_to_pose(1.0, 1.0, 90.0)  # Go to (1m, 1m) facing 90 degrees
-
-    # Simulate vision updates over time
-    for i in range(100):
-        # Simulate robot movement (this would come from your actual vision system)
-        progress = i / 100.0
-        current_x = progress * 1.0
-        current_y = progress * 1.0
-        current_yaw = progress * math.pi / 2
-
-        robot.process_vision_update(current_x, current_y, current_yaw)
-
-        if robot.nav_system.is_at_target():
-            print("Target reached!")
-            break
-
-        time.sleep(0.1)
-
-    # Stop navigation
-    robot.stop_navigation()
