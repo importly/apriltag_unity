@@ -19,7 +19,7 @@ class DriveSubsystem(Subsystem):
         self,
         config: Optional[RobotConfig] = None,
         serial_port: str = "COM7",
-        baud_rate: int = 9600,
+        baud_rate: int = 115200,
     ) -> None:
         super().__init__()
         self.config = config or RobotConfig()
