@@ -36,7 +36,9 @@ class DriveSubsystem(Subsystem):
         """Keep trying to open the serial port until successful."""
         while True:
             try:
-                ser = serial.Serial(port=port, baudrate=baud_rate, timeout=1)
+                ser = serial.Serial(port=port, baudrate=baud_rate, timeout=0.1)
+                time.sleep(2.0)
+                ser.reset_input_buffer()
                 logger.info(
                     "[Serial] ->︎ Connected to %s @ %sbps",
                     port,
