@@ -19,7 +19,7 @@ class DriveSubsystem(Subsystem):
         self,
         config: Optional[RobotConfig] = None,
         serial_port: str = "COM7",
-        baud_rate: int = 115200,
+        baud_rate: int = 9600,
     ) -> None:
         super().__init__()
         self.config = config or RobotConfig()
@@ -38,7 +38,7 @@ class DriveSubsystem(Subsystem):
             try:
                 ser = serial.Serial(port=port, baudrate=baud_rate, timeout=1)
                 logger.info(
-                    "[Serial] ▶︎ Connected to %s @ %sbps",
+                    "[Serial] ->︎ Connected to %s @ %sbps",
                     port,
                     baud_rate,
                 )

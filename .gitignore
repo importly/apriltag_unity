@@ -4,3 +4,5 @@ calibration_images.zip
 /false/calibration_data1.yaml
 /false/camera_matrix1.npy
 /false/dist_coeffs1.npy
+/starter.bat
+/robot.log

@@ -78,7 +78,7 @@ class VisionSubsystem(Subsystem):
 
         self.detector = Detector(
             families="tag36h11",
-            nthreads=4,
+            nthreads=24,
             quad_decimate=1.0,
             quad_sigma=0.0,
             refine_edges=1,
@@ -110,7 +110,7 @@ class VisionSubsystem(Subsystem):
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 logger.info("[TCP] Connecting to SPU on %s:%s…", host, port)
                 sock.connect((host, port))
-                logger.info("[TCP] ▶︎ Connected to SPU")
+                logger.info("[TCP] ->︎ Connected to SPU")
                 return sock
             except Exception as e:
                 logger.error(

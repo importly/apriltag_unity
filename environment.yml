@@ -1,5 +1,3 @@
-# environment.yml
-
 name: apriltag_unity_3.11
 channels:
   - defaults
