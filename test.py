@@ -5,7 +5,7 @@ import random
 import threading
 
 # Configure serial port parameters
-def open_serial(port: str, baud: int = 9600, timeout: float = 0.1) -> serial.Serial:
+def open_serial(port: str, baud: int = 115200, timeout: float = 0.1) -> serial.Serial:
     ser = serial.Serial(port, baud, timeout=timeout)
     # wait a moment for Arduino reset
     time.sleep(2.0)
@@ -64,7 +64,8 @@ def parallel_ramp_test(ser: serial.Serial, steps: int = 50, duration: float = 5.
 if __name__ == '__main__':
     # Adjust port for your system
     SERIAL_PORT = 'COM7'  # or '/dev/ttyUSB0' for Linux
-    ser = open_serial(SERIAL_PORT)
+    BAUD_RATE = 115200
+    ser = open_serial(SERIAL_PORT, BAUD_RATE)
 
     try:
         # 1. Discrete values test
