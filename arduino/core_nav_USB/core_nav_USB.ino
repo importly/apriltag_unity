@@ -7,6 +7,23 @@
 constexpr unsigned long BAUD_RATE = 115200; // use faster baud
 constexpr int LED_PIN = 2;
 
+// dead-band threshold in the middle
+constexpr float DEAD_BAND = 0.0f;
+
+// helper to push any nonzero speed out past the dead-band
+float scaleSpeed(float s) {
+  if (s > 0.0f) {
+    // map (0…1) → (DEAD_BAND…1)
+    return DEAD_BAND + (1.0f - DEAD_BAND) * s;
+  } else if (s < 0.0f) {
+    // map (–1…0) → (–1…–DEAD_BAND)
+    return -DEAD_BAND + (1.0f - DEAD_BAND) * s;
+  } else {
+    // exactly zero stays zero
+    return 0.0f;
+  }
+}
+
 // Motor driver instance (same pins as original setup)
 BTS7960MotorDriverRC motorDriverAPI(
   32, 33, 21, 22,  // Motor 2 pins (RPWM2, LPWM2, REN2, LEN2)
@@ -54,7 +71,11 @@ void loop() {
   }
 
   if (updated) {
-    motorDriverAPI.setTargetSpeeds(targetSpeedLeft, targetSpeedRight);
+    // apply dead-band scaling here
+    float outL = scaleSpeed(targetSpeedLeft);
+    float outR = scaleSpeed(targetSpeedRight);
+    motorDriverAPI.setTargetSpeeds(outL, outR);
   }
+
   motorDriverAPI.loop();
 }

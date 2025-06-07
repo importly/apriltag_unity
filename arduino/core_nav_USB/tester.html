@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Control Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            opacity: 0.8;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 30px;
+        }
+
+        .channel {
+            text-align: center;
+        }
+
+        .channel-title {
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .slider-container {
+            position: relative;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .vertical-slider {
+            writing-mode: bt-lr;
+            -webkit-appearance: slider-vertical;
+            width: 40px;
+            height: 280px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .vertical-slider:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .vertical-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .vertical-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        .speed-display {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin-bottom: 10px;
+        }
+
+        .speed-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .status-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4757;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #2ed573;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .serial-config {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .config-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .config-item label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .config-item input, .config-item select {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .config-item input:disabled, .config-item select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .connect-btn {
+            padding: 12px 24px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .connect-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .connect-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+            
+            .slider-container {
+                height: 200px;
+            }
+            
+            .vertical-slider {
+                height: 180px;
+            }
+            
+            .serial-config {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Robot Control</h1>
+            <p>Dual Channel Motor Controller</p>
+        </div>
+
+        <div class="controls">
+            <div class="channel">
+                <div class="channel-title">Left Motor (Ch 0)</div>
+                <div class="slider-container">
+                    <input type="range" 
+                           id="leftSlider" 
+                           class="vertical-slider"
+                           min="-100" 
+                           max="100" 
+                           value="0" 
+                           orient="vertical">
+                </div>
+                <div class="speed-display" id="leftSpeed">0.00</div>
+                <div class="speed-label">Speed Value</div>
+            </div>
+
+            <div class="channel">
+                <div class="channel-title">Right Motor (Ch 1)</div>
+                <div class="slider-container">
+                    <input type="range" 
+                           id="rightSlider" 
+                           class="vertical-slider"
+                           min="-100" 
+                           max="100" 
+                           value="0" 
+                           orient="vertical">
+                </div>
+                <div class="speed-display" id="rightSpeed">0.00</div>
+                <div class="speed-label">Speed Value</div>
+            </div>
+        </div>
+
+        <div class="status-panel">
+            <div class="connection-status">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+
+            <div class="serial-config">
+                <div class="config-item">
+                    <label>Serial Port</label>
+                    <input type="text" id="serialPort" placeholder="COM7 or /dev/ttyUSB0" value="COM7">
+                </div>
+                <div class="config-item">
+                    <label>Baud Rate</label>
+                    <select id="baudRate">
+                        <option value="9600">9600</option>
+                        <option value="19200">19200</option>
+                        <option value="38400">38400</option>
+                        <option value="57600">57600</option>
+                        <option value="115200" selected>115200</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="connect-btn" id="connectBtn">Connect to Robot</button>
+            
+            <div class="message" id="statusMessage">
+                <strong>Ready:</strong> Click "Connect to Robot" to establish a real serial connection to your Arduino controller.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class RobotController {
+            constructor() {
+                this.isConnected = false;
+                this.serialPort = null;
+                this.writer = null;
+                this.reader = null;
+                this.baudRate = 115200;
+                this.lastSentTime = 0;
+                this.sendInterval = 50; // 20Hz update rate
+                this.readLoop = null;
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.updateDisplay();
+                this.checkWebSerialSupport();
+            }
+
+            initializeElements() {
+                this.leftSlider = document.getElementById('leftSlider');
+                this.rightSlider = document.getElementById('rightSlider');
+                this.leftSpeed = document.getElementById('leftSpeed');
+                this.rightSpeed = document.getElementById('rightSpeed');
+                this.statusIndicator = document.getElementById('statusIndicator');
+                this.statusText = document.getElementById('statusText');
+                this.connectBtn = document.getElementById('connectBtn');
+                this.serialPortInput = document.getElementById('serialPort');
+                this.baudRateSelect = document.getElementById('baudRate');
+                this.statusMessage = document.getElementById('statusMessage');
+            }
+
+            checkWebSerialSupport() {
+                if (!('serial' in navigator)) {
+                    this.statusMessage.innerHTML = '<strong>Error:</strong> Web Serial API not supported. Please use Chrome, Edge, or Opera browser.';
+                    this.connectBtn.disabled = true;
+                    this.connectBtn.textContent = 'Web Serial Not Supported';
+                } else {
+                    this.statusMessage.innerHTML = '<strong>Ready:</strong> Click "Connect to Robot" to establish a real serial connection to your Arduino controller.';
+                }
+            }
+
+            bindEvents() {
+                this.leftSlider.addEventListener('input', () => this.onSliderChange('left'));
+                this.rightSlider.addEventListener('input', () => this.onSliderChange('right'));
+                this.connectBtn.addEventListener('click', () => this.toggleConnection());
+                
+                // Keyboard controls
+                document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+            }
+
+            onSliderChange(channel) {
+                const now = Date.now();
+                if (now - this.lastSentTime < this.sendInterval) return;
+                
+                const leftValue = parseFloat(this.leftSlider.value) / 100;
+                const rightValue = parseFloat(this.rightSlider.value) / 100;
+                
+                this.leftSpeed.textContent = leftValue.toFixed(2);
+                this.rightSpeed.textContent = rightValue.toFixed(2);
+                
+                if (this.isConnected) {
+                    if (channel === 'left') {
+                        this.sendCommand(0, leftValue);
+                    } else {
+                        this.sendCommand(1, rightValue);
+                    }
+                }
+                
+                this.lastSentTime = now;
+            }
+
+            handleKeyboard(e) {
+                const step = 10;
+                let leftVal = parseInt(this.leftSlider.value);
+                let rightVal = parseInt(this.rightSlider.value);
+                
+                switch(e.key) {
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        this.leftSlider.value = Math.min(100, leftVal + step);
+                        this.rightSlider.value = Math.min(100, rightVal + step);
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        this.leftSlider.value = Math.max(-100, leftVal - step);
+                        this.rightSlider.value = Math.max(-100, rightVal - step);
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        this.leftSlider.value = Math.max(-100, leftVal - step);
+                        this.rightSlider.value = Math.min(100, rightVal + step);
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        this.leftSlider.value = Math.min(100, leftVal + step);
+                        this.rightSlider.value = Math.max(-100, rightVal - step);
+                        break;
+                    case ' ':
+                        e.preventDefault();
+                        this.leftSlider.value = 0;
+                        this.rightSlider.value = 0;
+                        break;
+                    default:
+                        return;
+                }
+                
+                this.onSliderChange('both');
+            }
+
+            encodePacket(channel, speed) {
+                // Replicate the Python packet encoding logic
+                const raw = Math.floor(((speed + 1.0) / 2.0) * 255);
+                const clampedRaw = Math.max(0, Math.min(255, raw));
+                const lsb = clampedRaw & 0x7F;
+                const msb = (clampedRaw >> 7) & 0x7F;
+                
+                return new Uint8Array([0x84, channel, lsb, msb]);
+            }
+
+            async sendCommand(channel, speed) {
+                if (!this.isConnected || !this.writer) return;
+                
+                try {
+                    const packet = this.encodePacket(channel, speed);
+                    await this.writer.write(packet);
+                    
+                    console.log(`Sent to channel ${channel}: speed=${speed.toFixed(2)}, packet=[${Array.from(packet).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
+                    
+                    this.updateStatus(`Command sent: Ch${channel} = ${speed.toFixed(2)}`);
+                    
+                } catch (error) {
+                    console.error('Send command error:', error);
+                    this.updateStatus('Send error: ' + error.message);
+                }
+            }
+
+            updateStatus(message) {
+                this.statusMessage.innerHTML = `<strong>Status:</strong> ${message}`;
+            }
+
+            async toggleConnection() {
+                if (this.isConnected) {
+                    this.disconnect();
+                } else {
+                    await this.connect();
+                }
+            }
+
+            async connect() {
+                if (!('serial' in navigator)) {
+                    alert('Web Serial API not supported in this browser. Please use Chrome, Edge, or Opera.');
+                    return;
+                }
+
+                try {
+                    this.connectBtn.disabled = true;
+                    this.connectBtn.textContent = 'Connecting...';
+                    this.updateStatus('Requesting serial port...');
+                    
+                    // Request port from user
+                    this.serialPort = await navigator.serial.requestPort();
+                    
+                    // Open the serial port
+                    const baudRate = parseInt(this.baudRateSelect.value);
+                    await this.serialPort.open({
+                        baudRate: baudRate,
+                        dataBits: 8,
+                        stopBits: 1,
+                        parity: 'none',
+                        flowControl: 'none'
+                    });
+
+                    // Set up writer and reader
+                    this.writer = this.serialPort.writable.getWriter();
+                    this.reader = this.serialPort.readable.getReader();
+                    
+                    // Wait for Arduino reset (like in Python code)
+                    this.updateStatus('Waiting for Arduino initialization...');
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // Start reading responses
+                    this.startReading();
+                    
+                    this.isConnected = true;
+                    this.updateConnectionStatus();
+                    this.updateStatus(`Connected at ${baudRate} baud`);
+                    
+                    console.log(`Successfully connected at ${baudRate} baud`);
+                    
+                } catch (error) {
+                    console.error('Connection failed:', error);
+                    this.updateStatus('Connection failed: ' + error.message);
+                    
+                    if (error.name === 'NotFoundError') {
+                        alert('No serial port selected. Please try again and select your Arduino port.');
+                    } else {
+                        alert('Connection failed: ' + error.message);
+                    }
+                } finally {
+                    this.connectBtn.disabled = false;
+                }
+            }
+
+            async startReading() {
+                this.readLoop = async () => {
+                    try {
+                        while (this.isConnected && this.reader) {
+                            const { value, done } = await this.reader.read();
+                            if (done) break;
+                            
+                            // Convert bytes to string and log responses
+                            const text = new TextDecoder().decode(value);
+                            if (text.trim()) {
+                                console.log('Arduino response:', text.trim());
+                                this.updateStatus('Last response: ' + text.trim());
+                            }
+                        }
+                    } catch (error) {
+                        if (this.isConnected) {
+                            console.error('Read error:', error);
+                            this.updateStatus('Read error: ' + error.message);
+                        }
+                    }
+                };
+                this.readLoop();
+            }
+
+            async disconnect() {
+                try {
+                    this.isConnected = false;
+                    
+                    // Send stop commands before disconnecting
+                    if (this.writer) {
+                        await this.sendCommand(0, 0);
+                        await this.sendCommand(1, 0);
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                    // Close reader
+                    if (this.reader) {
+                        await this.reader.cancel();
+                        await this.reader.releaseLock();
+                        this.reader = null;
+                    }
+                    
+                    // Close writer
+                    if (this.writer) {
+                        await this.writer.releaseLock();
+                        this.writer = null;
+                    }
+                    
+                    // Close port
+                    if (this.serialPort) {
+                        await this.serialPort.close();
+                        this.serialPort = null;
+                    }
+                    
+                    this.updateConnectionStatus();
+                    this.updateStatus('Disconnected safely');
+                    
+                    // Reset sliders to neutral
+                    this.leftSlider.value = 0;
+                    this.rightSlider.value = 0;
+                    this.onSliderChange('both');
+                    
+                    console.log('Disconnected from robot');
+                    
+                } catch (error) {
+                    console.error('Disconnect error:', error);
+                    this.updateStatus('Disconnect error: ' + error.message);
+                }
+            }
+
+            updateConnectionStatus() {
+                if (this.isConnected) {
+                    this.statusIndicator.classList.add('connected');
+                    this.statusText.textContent = 'Connected';
+                    this.connectBtn.textContent = 'Disconnect';
+                    this.serialPortInput.disabled = true;
+                    this.baudRateSelect.disabled = true;
+                } else {
+                    this.statusIndicator.classList.remove('connected');
+                    this.statusText.textContent = 'Disconnected';
+                    this.connectBtn.textContent = 'Connect to Robot';
+                    this.serialPortInput.disabled = false;
+                    this.baudRateSelect.disabled = false;
+                }
+            }
+
+            updateDisplay() {
+                const leftValue = parseFloat(this.leftSlider.value) / 100;
+                const rightValue = parseFloat(this.rightSlider.value) / 100;
+                
+                this.leftSpeed.textContent = leftValue.toFixed(2);
+                this.rightSpeed.textContent = rightValue.toFixed(2);
+            }
+        }
+
+        // Initialize the robot controller when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new RobotController();
+        });
+    </script>
+</body>
+</html>

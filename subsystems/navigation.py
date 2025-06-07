@@ -27,8 +27,8 @@ __all__ = [
 @dataclass
 class RobotConfig: # TODO: fix
     """Configuration parameters for the differential drive robot."""
-    wheelbase_inches: float = 20.0  # Distance between wheels
-    wheel_diameter_inches: float = 4.0  # Wheel diameter
+    wheelbase_inches: float = 14.5  # Distance between wheels
+    wheel_diameter_inches: float = 6.2  # Wheel diameter
     max_wheel_rpm: float = 600.0  # Maximum wheel speed
 
     # Computed properties
@@ -153,13 +153,13 @@ class DifferentialDriveController:
         # PID Controllers for linear and angular motion
         # You may need to tune these gains for your specific robot
         self.linear_controller = ProfiledPIDController( # TODO: fix
-            kp=1.0, ki=0.0, kd=0.1,
+            kp=1.0, ki=0.0, kd=0.0,
             constraints=linear_constraints,
             period=control_period
         )
 
         self.angular_controller = ProfiledPIDController( # TODO: fix
-            kp=1.0, ki=0.0, kd=0.15,
+            kp=5, ki=0.0, kd=0.0,
             constraints=angular_constraints,
             period=control_period
         )
