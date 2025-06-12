@@ -30,12 +30,10 @@ class VisionSubsystem(Subsystem):
         frame_width: int = 1600,
         frame_height: int = 1200,
         frame_rate: int = 50,
-        spu_host: str = "localhost",
-        spu_port: int = 5008,
     ) -> None:
         super().__init__()
         if camera_indices is None:
-            camera_indices = [0]
+            camera_indices = [0,2]
         self.camera_indices = camera_indices
         self.tag_size = tag_size
         self.caps: list[cv2.VideoCapture] = []
@@ -78,8 +76,8 @@ class VisionSubsystem(Subsystem):
 
         self.detector = Detector(
             families="tag36h11",
-            nthreads=24,
-            quad_decimate=1.0,
+            nthreads=6,
+            quad_decimate=3.0,
             quad_sigma=0.0,
             refine_edges=1,
             decode_sharpening=0.25,
@@ -100,25 +98,7 @@ class VisionSubsystem(Subsystem):
             for i, cam_idx in enumerate(camera_indices)
         }
 
-        self.sock = self._connect_to_spu(spu_host, spu_port)
         self.pose_estimator = PoseEstimator()
-
-    # ------------------------------------------------------------------ utils
-    def _connect_to_spu(self, host: str, port: int, retry_delay: float = 1.0):
-        while True:
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                logger.info("[TCP] Connecting to SPU on %s:%s…", host, port)
-                sock.connect((host, port))
-                logger.info("[TCP] ->︎ Connected to SPU")
-                return sock
-            except Exception as e:
-                logger.error(
-                    "[TCP] ERROR connecting to SPU: %s. Retrying in %ss…",
-                    e,
-                    retry_delay,
-                )
-                time.sleep(retry_delay)
 
     # --------------------------------------------------------------- subsystem
     def periodic(self) -> None:  # type: ignore[override]
@@ -151,7 +131,7 @@ class VisionSubsystem(Subsystem):
                     t_cam,
                     self.tag_size * 0.5,
                 )
-            cv2.imshow(f"Cam {idx}", frame)
+            # cv2.imshow(f"Cam {idx}", frame)
 
         self.pose_estimator.update(timestamp, self.pose_estimator.get_estimated_position())
         self._process_vision_measurements(detections_by_camera, timestamp, self.pose_estimator)
@@ -165,14 +145,7 @@ class VisionSubsystem(Subsystem):
                 stddevs,
             )
             line = f"{pose2d.x:.4f},{pose2d.y:.4f},{pose2d.yaw:.4f}\r\n"
-            try:
-                self.sock.sendall(line.encode("utf8"))
-            except Exception as e:
-                logger.error("[TCP] ERROR sending to SPU: %s. Reconnecting…", e)
-                self.sock.close()
-                self.sock = self._connect_to_spu(
-                    self.sock.getpeername()[0], self.sock.getpeername()[1]
-                )
+
         else:
             logger.info("[%.3f] No valid tag detections.", timestamp)
 
@@ -205,8 +178,6 @@ class VisionSubsystem(Subsystem):
                 )
 
     def close(self) -> None:  # type: ignore[override]
-        if self.sock:
-            self.sock.close()
         for cap in self.caps:
             cap.release()
         cv2.destroyAllWindows()

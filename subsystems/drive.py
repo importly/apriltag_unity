@@ -4,9 +4,10 @@ import time
 from typing import Optional
 
 import serial
+import platform
 
 from subsystems.navigation import RobotConfig, RobotNavigationSystem
-from .scheduler import Subsystem
+from subsystems.scheduler import Subsystem
 from util.logging_utils import get_robot_logger
 
 logger = get_robot_logger(__name__)
@@ -18,7 +19,7 @@ class DriveSubsystem(Subsystem):
     def __init__(
         self,
         config: Optional[RobotConfig] = None,
-        serial_port: str = "COM7",
+        serial_port: str = "COM7" if platform.system() == "Windows" else "/dev/ttyUSB0",
         baud_rate: int = 115200,
     ) -> None:
         super().__init__()
