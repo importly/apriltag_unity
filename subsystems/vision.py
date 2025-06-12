@@ -15,6 +15,7 @@ from .geometry import (
     PoseEstimator,
 )
 from .scheduler import Subsystem
+import threading
 from util.logging_utils import get_robot_logger
 
 logger = get_robot_logger(__name__)
@@ -100,6 +101,35 @@ class VisionSubsystem(Subsystem):
 
         self.pose_estimator = PoseEstimator()
 
+        self._running = False
+        self._thread: threading.Thread | None = None
+
+    # -------------------------------------------------------------- threading
+    def start(self) -> None:
+        """Start the vision processing thread."""
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Stop the vision processing thread."""
+        self._running = False
+        if self._thread:
+            self._thread.join()
+            self._thread = None
+
+    def _run_loop(self) -> None:
+        """Internal thread loop calling :meth:`periodic`."""
+        while self._running:
+            start = time.time()
+            self.periodic()
+            elapsed = time.time() - start
+            if self.frame_period > 0:
+                sleep_time = max(0.0, self.frame_period - elapsed)
+                time.sleep(sleep_time)
+
     # --------------------------------------------------------------- subsystem
     def periodic(self) -> None:  # type: ignore[override]
         from util.logging_utils import warn_if_overrun
@@ -178,6 +208,7 @@ class VisionSubsystem(Subsystem):
                 )
 
     def close(self) -> None:  # type: ignore[override]
+        self.stop()
         for cap in self.caps:
             cap.release()
         cv2.destroyAllWindows()

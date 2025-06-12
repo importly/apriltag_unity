@@ -14,7 +14,7 @@ def main() -> None:
     drive = DriveSubsystem()
     scheduler.register(drive)
     vision = VisionSubsystem()
-    scheduler.register(vision)
+    vision.start()
 
     # Initialize robot at origin facing north
     drive.update_pose(0.0, 0.0, 0.0)
@@ -41,6 +41,7 @@ def main() -> None:
             # drive.navigate_to(x, y, heading)
 
     finally:
+        vision.stop()
         scheduler.shutdown()
         logger.info("Robot program exiting")
 
