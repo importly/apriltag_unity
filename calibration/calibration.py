@@ -81,9 +81,9 @@ if charuco_corners_all:
     print("Camera matrix (K):\n", K)
     print("Distortion coefficients:\n", distCoeffs.ravel())
 
-    np.save('camera_matrix1.npy', K)
-    np.save('dist_coeffs1.npy', distCoeffs)
-    fs = cv2.FileStorage('calibration_data1.yaml', cv2.FILE_STORAGE_WRITE)
+    np.save('camera_matrix2.npy', K)
+    np.save('dist_coeffs2.npy', distCoeffs)
+    fs = cv2.FileStorage('calibration_data2.yaml', cv2.FILE_STORAGE_WRITE)
     fs.write('K', K)
     fs.write('distCoeffs', distCoeffs)
     fs.release()
