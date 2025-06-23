@@ -218,20 +218,6 @@ class PoseEstimator:
     def get_estimated_position(self) -> Pose2D:
         return self.pose_estimate
 
-    # ------------------------------------------------------------------- update
-    def update(self, timestamp: Optional[float], odometry_pose: Pose2D) -> Pose2D:
-        if timestamp is None:
-            timestamp = time.time()
-        self.odometry_buffer.add_sample(timestamp, odometry_pose)
-
-        if self.vision_updates:
-            last_update = next(reversed(self.vision_updates.values()))
-            self.pose_estimate = last_update.compensate(odometry_pose)
-        else:
-            self.pose_estimate = odometry_pose
-
-        return self.pose_estimate
-
     # ---------------------------------------------------------------- vision
     def _clean_up_vision_updates(self) -> None:
         if not self.odometry_buffer.buffer:
@@ -307,9 +293,9 @@ class PoseEstimator:
         self.pose_estimate = vision_update.compensate(self.pose_estimate)
 
 
-    def estimate(self) -> tuple[Pose2D, tuple[float, float, float]]:
+    def estimate(self) -> Pose2D:
         """Return the latest pose estimate."""
-        return self.pose_estimate, (0.0, 0.0, 0.0)
+        return self.pose_estimate
 
 
 class VisionUpdate:

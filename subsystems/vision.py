@@ -19,11 +19,28 @@ from util.logging_utils import get_robot_logger
 
 logger = get_robot_logger(__name__)
 
+# Hey soloman, I left some comments in the code to help you understand, You need to have calibrations
+# all of that stuff is in the calibration directory
+def _connect_to_spu(host: str, port: int, retry_delay: float = 1.0):
+    while True:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            logger.info("[TCP] Connecting to SPU on %s:%s…", host, port)
+            sock.connect((host, port))
+            logger.info("[TCP] ->︎ Connected to SPU")
+            return sock
+        except Exception as e:
+            logger.error(
+                "[TCP] ERROR connecting to SPU: %s. Retrying in %ss…",
+                e,
+                retry_delay,
+            )
+            time.sleep(retry_delay)
+
 
 class VisionSubsystem(Subsystem):
-    """Subsystem handling camera capture and AprilTag pose estimation."""
-
-    def __init__(
+    def __init__( # there are a bunch of parameters here, you can change them to suit your needs, edit the main.py file
+                  # to change them but there are the main ones you will need.
         self,
         camera_indices: list[int] | None = None,
         tag_size: float = 0.165,
@@ -32,10 +49,19 @@ class VisionSubsystem(Subsystem):
         frame_rate: int = 50,
         spu_host: str = "localhost",
         spu_port: int = 5008,
+        threads: int = 8,
+        families: str = "tag36h11",
+        quad_decimate: float = 1.0,
+        quad_sigma: float = 0.0,
+        refine_edges: int = 1,
+        decode_sharpening: float = 0.25,
+        debug: int = 0,
+        camera_poses: list[Pose3D] | None = None,
+        field_apriltag_poses: dict[int, Pose3D] | None = None,
     ) -> None:
         super().__init__()
         if camera_indices is None:
-            camera_indices = [0]
+            camera_indices = [1,2]
         self.camera_indices = camera_indices
         self.tag_size = tag_size
         self.caps: list[cv2.VideoCapture] = []
@@ -51,8 +77,7 @@ class VisionSubsystem(Subsystem):
             if not cap.isOpened():
                 raise RuntimeError(f"Cannot open camera {idx}")
             self.caps.append(cap)
-            # try .npy then YAML
-            cm_npy = Path(f"camera_matrix{cam_num}.npy")
+            cm_npy = Path(f"camera_matrix{cam_num}.npy") # these are the camera matrices and distortion coefficients
             dist_npy = Path(f"dist_coeffs{cam_num}.npy")
             if cm_npy.exists() and dist_npy.exists():
                 K = np.load(cm_npy)
@@ -77,20 +102,19 @@ class VisionSubsystem(Subsystem):
             self.camera_params.append((fx, fy, cx, cy))
 
         self.detector = Detector(
-            families="tag36h11",
-            nthreads=24,
-            quad_decimate=1.0,
-            quad_sigma=0.0,
-            refine_edges=1,
-            decode_sharpening=0.25,
-            debug=0,
+            families=families,
+            nthreads=threads,
+            quad_decimate=quad_decimate,
+            quad_sigma=quad_sigma,
+            refine_edges=refine_edges,
+            decode_sharpening=decode_sharpening,
+            debug=debug,
         )
-
-        self.camera_poses = [
+        self.camera_poses = camera_poses if camera_poses is not None else [
             Pose3D(Translation3D(0.0, 0.0, 0.0), Rotation3D(0.0, 0.0, 0.0))
             for _ in camera_indices
         ]
-        self.field_apriltag_poses: dict[int, Pose3D] = {
+        self.field_apriltag_poses: dict[int, Pose3D] = field_apriltag_poses if field_apriltag_poses is not None else {
             1: Pose3D(Translation3D(0.0, 0.0, 0.0), Rotation3D(0.0, 0.0, 0.0)),
             2: Pose3D(Translation3D(0.0, 0.0, 0.0), Rotation3D(0.0, 0.0, 0.0)),
             3: Pose3D(Translation3D(0.0, 0.0, 0.0), Rotation3D(0.0, 0.0, 0.0)),
@@ -100,27 +124,10 @@ class VisionSubsystem(Subsystem):
             for i, cam_idx in enumerate(camera_indices)
         }
 
-        self.sock = self._connect_to_spu(spu_host, spu_port)
+        self.sock = _connect_to_spu(spu_host, spu_port)
         self.pose_estimator = PoseEstimator()
 
-    # ------------------------------------------------------------------ utils
-    def _connect_to_spu(self, host: str, port: int, retry_delay: float = 1.0):
-        while True:
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                logger.info("[TCP] Connecting to SPU on %s:%s…", host, port)
-                sock.connect((host, port))
-                logger.info("[TCP] ->︎ Connected to SPU")
-                return sock
-            except Exception as e:
-                logger.error(
-                    "[TCP] ERROR connecting to SPU: %s. Retrying in %ss…",
-                    e,
-                    retry_delay,
-                )
-                time.sleep(retry_delay)
-
-    # --------------------------------------------------------------- subsystem
+    # like update in unity
     def periodic(self) -> None:  # type: ignore[override]
         from util.logging_utils import warn_if_overrun
         start_time = time.time()
@@ -153,16 +160,14 @@ class VisionSubsystem(Subsystem):
                 )
             cv2.imshow(f"Cam {idx}", frame)
 
-        self.pose_estimator.update(timestamp, self.pose_estimator.get_estimated_position())
         self._process_vision_measurements(detections_by_camera, timestamp, self.pose_estimator)
-        fused = self.pose_estimator.estimate()
-        if fused:
-            pose2d, stddevs = fused
+        pose2d = self.pose_estimator.estimate()
+
+        if pose2d is not None:
             logger.info(
                 "[%.3f] Fused pose → %s, σ = %s",
                 timestamp,
-                pose2d,
-                stddevs,
+                pose2d
             )
             line = f"{pose2d.x:.4f},{pose2d.y:.4f},{pose2d.yaw:.4f}\r\n"
             try:
@@ -170,13 +175,12 @@ class VisionSubsystem(Subsystem):
             except Exception as e:
                 logger.error("[TCP] ERROR sending to SPU: %s. Reconnecting…", e)
                 self.sock.close()
-                self.sock = self._connect_to_spu(
+                self.sock = _connect_to_spu(
                     self.sock.getpeername()[0], self.sock.getpeername()[1]
                 )
         else:
             logger.info("[%.3f] No valid tag detections.", timestamp)
 
-        # Warn if processing time exceeds expected frame period
         elapsed = time.time() - start_time
         if self.frame_period > 0:
             warn_if_overrun("Vision periodic", elapsed, self.frame_period)

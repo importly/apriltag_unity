@@ -4,6 +4,8 @@ import struct
 import random
 import threading
 
+## testing script if arudino communication is not working.
+
 # Configure serial port parameters
 def open_serial(port: str, baud: int = 115200, timeout: float = 0.1) -> serial.Serial:
     ser = serial.Serial(port, baud, timeout=timeout)

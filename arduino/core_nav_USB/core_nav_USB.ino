@@ -4,11 +4,11 @@
 // --------------------------------------------------
 // Configuration
 // --------------------------------------------------
-constexpr unsigned long BAUD_RATE = 115200; // use faster baud
+constexpr unsigned long BAUD_RATE = 115200; 
 constexpr int LED_PIN = 2;
 
 // dead-band threshold in the middle
-constexpr float DEAD_BAND = 0.0f;
+constexpr float DEAD_BAND = 0.22f;
 
 // helper to push any nonzero speed out past the dead-band
 float scaleSpeed(float s) {
